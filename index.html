@@ -1,0 +1,644 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell, Legend, BarChart, Bar, AreaChart, Area
+} from 'recharts';
+import { 
+  Wallet, 
+  TrendingUp, 
+  PieChart as PieChartIcon, 
+  Briefcase,
+  AlertCircle,
+  DollarSign,
+  Zap,
+  Calculator,
+  RefreshCw,
+  Coins,
+  ShieldCheck,
+  Mail,
+  Edit3,
+  Beaker,
+  Layers,
+  Repeat,
+  Home,
+  Car,
+  GraduationCap,
+  ShoppingBag,
+  Film,
+  ZapOff,
+  Wifi,
+  HeartPulse,
+  Gamepad2,
+  Settings2
+} from 'lucide-react';
+
+// --- Configuration & Data ---
+
+const CAREERS = [
+  { id: 'swe', name: 'Software Engineer', entrySalary: 85000, description: 'Developing and maintaining software systems.' },
+  { id: 'nurse', name: 'Registered Nurse', entrySalary: 68000, description: 'Providing patient care in healthcare facilities.' },
+  { id: 'teacher', name: 'High School Teacher', entrySalary: 45000, description: 'Educating students and preparing lesson plans.' },
+  { id: 'marketing', name: 'Marketing Coordinator', entrySalary: 52000, description: 'Executing marketing campaigns and market research.' },
+  { id: 'accountant', name: 'Junior Accountant', entrySalary: 58000, description: 'Managing financial records and tax preparation.' },
+  { id: 'designer', name: 'Graphic Designer', entrySalary: 48000, description: 'Creating visual concepts for branding and media.' },
+  { id: 'other', name: 'Other (Custom)', entrySalary: 50000, description: 'Enter your custom career details below.' },
+];
+
+// Expanded Expense Categories based on user request
+const INITIAL_EXPENSE_STATE = [
+  { id: 'housing', name: 'Housing', budget: 1200, icon: <Home className="w-4 h-4" />, active: true, step: 50, max: 5000 },
+  { id: 'utilities', name: 'Utilities', budget: 150, icon: <Zap className="w-4 h-4" />, active: true, step: 10, max: 500 },
+  { id: 'telecom', name: 'Phone & Internet', budget: 100, icon: <Wifi className="w-4 h-4" />, active: true, step: 5, max: 300 },
+  { id: 'transport', name: 'Transportation', budget: 400, icon: <Car className="w-4 h-4" />, active: true, step: 25, max: 1500 },
+  { id: 'food', name: 'Food & Nutrition', budget: 500, icon: <ShoppingBag className="w-4 h-4" />, active: true, step: 20, max: 1500 },
+  { id: 'insurance', name: 'Insurance (Life/Health)', budget: 200, icon: <HeartPulse className="w-4 h-4" />, active: true, step: 10, max: 1000 },
+  { id: 'education', name: 'Education & Training', budget: 300, icon: <GraduationCap className="w-4 h-4" />, active: true, step: 25, max: 2000 },
+  { id: 'discretionary', name: 'Discretionary Spending', budget: 200, icon: <Gamepad2 className="w-4 h-4" />, active: true, step: 10, max: 1000 },
+];
+
+const RANDOM_EVENTS = [
+  { title: "Flat Tire", cost: 250, description: "Your car hit a pothole. Need a new tire and alignment.", severity: "low" },
+  { title: "Dental Emergency", cost: 800, description: "Unexpected root canal needed immediately.", severity: "high" },
+  { title: "Tax Refund", cost: -500, description: "Surprise! You overpaid your taxes last year.", severity: "bonus" },
+  { title: "Laptop Failure", cost: 1200, description: "Your main work/study tool died. Replacement is urgent.", severity: "high" },
+  { title: "Wedding Gift", cost: 150, description: "Your best friend is getting married!", severity: "low" },
+  { title: "Speeding Ticket", cost: 220, description: "Caught doing 15 over in a school zone.", severity: "low" },
+];
+
+const THEME = {
+  navy: '#0f172a',
+  gold: '#eab308',
+  goldLight: '#fefce8',
+  goldDark: '#a16207',
+  slate: '#f8fafc'
+};
+
+const CHART_COLORS = [THEME.gold, '#6366f1', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#db2777'];
+
+// --- Helper Functions ---
+
+const calculateMonthlyTakeHome = (annualSalary) => {
+  const taxRate = annualSalary > 80000 ? 0.28 : annualSalary > 50000 ? 0.22 : 0.18;
+  const annualTakeHome = annualSalary * (1 - taxRate);
+  return Math.floor(annualTakeHome / 12);
+};
+
+// --- Main Component ---
+
+export default function App() {
+  const [selectedCareer, setSelectedCareer] = useState(CAREERS[0]);
+  const [manualSalary, setManualSalary] = useState(CAREERS[0].entrySalary);
+  const [expenses, setExpenses] = useState(INITIAL_EXPENSE_STATE);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Savings State
+  const [emergencyFundActive, setEmergencyFundActive] = useState(true);
+  const [emergencyFundAmount, setEmergencyFundAmount] = useState(300);
+  const [envelopes, setEnvelopes] = useState([
+    { id: 1, title: 'Travel Fund', amount: 100 },
+    { id: 2, title: 'New Car', amount: 100 },
+    { id: 3, title: 'Electronics', amount: 50 },
+  ]);
+
+  // Subscription State
+  const [subsActive, setSubsActive] = useState(true);
+  const [subsAmount, setSubsAmount] = useState(85);
+
+  // Debt State (Accelerator specific logic uses education/debt categories)
+  const [totalDebt, setTotalDebt] = useState(30000);
+  const [interestRate, setInterestRate] = useState(5.5);
+  const [extraPayment, setExtraPayment] = useState(0);
+
+  // Shock State
+  const [currentEvent, setCurrentEvent] = useState(null);
+  
+  const monthlyIncome = useMemo(() => calculateMonthlyTakeHome(manualSalary), [manualSalary]);
+  
+  const totalSavings = useMemo(() => {
+    const eFund = emergencyFundActive ? emergencyFundAmount : 0;
+    const envelopeSum = envelopes.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    return eFund + envelopeSum;
+  }, [emergencyFundActive, emergencyFundAmount, envelopes]);
+
+  const totalExpenses = useMemo(() => {
+    const baseExpenses = expenses.reduce((acc, curr) => acc + (curr.active ? (Number(curr.budget) || 0) : 0), 0);
+    const subCost = subsActive ? subsAmount : 0;
+    return baseExpenses + totalSavings + subCost;
+  }, [expenses, totalSavings, subsActive, subsAmount]);
+
+  const remainingBalance = monthlyIncome - totalExpenses - (currentEvent?.cost || 0);
+  const savingsRate = ((totalSavings / monthlyIncome) * 100).toFixed(1);
+
+  const handleUpdateExpenseValue = (id, value) => {
+    setExpenses(prev => prev.map(exp => 
+      exp.id === id ? { ...exp, budget: Math.max(0, parseInt(value) || 0) } : exp
+    ));
+  };
+
+  const toggleExpenseActive = (id) => {
+    setExpenses(prev => prev.map(exp => 
+      exp.id === id ? { ...exp, active: !exp.active } : exp
+    ));
+  };
+
+  const updateEnvelope = (id, field, value) => {
+    setEnvelopes(prev => prev.map(env => 
+      env.id === id ? { ...env, [field]: field === 'amount' ? (parseInt(value) || 0) : value } : env
+    ));
+  };
+
+  const triggerRandomEvent = () => {
+    const event = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
+    setCurrentEvent(event);
+  };
+
+  const debtProjection = useMemo(() => {
+    let data = [];
+    let balanceStandard = totalDebt;
+    let balanceAccelerated = totalDebt;
+    const monthlyRate = (interestRate / 100) / 12;
+    const educationExp = expenses.find(e => e.id === 'education');
+    const basePayment = (educationExp?.active ? educationExp.budget : 0);
+    
+    for (let month = 0; month <= 60; month += 6) {
+      data.push({
+        month: `Month ${month}`,
+        Standard: Math.max(0, Math.round(balanceStandard)),
+        Accelerated: Math.max(0, Math.round(balanceAccelerated))
+      });
+      
+      for(let i = 0; i < 6; i++) {
+        balanceStandard = (balanceStandard * (1 + monthlyRate)) - basePayment;
+        balanceAccelerated = (balanceAccelerated * (1 + monthlyRate)) - (basePayment + extraPayment);
+      }
+    }
+    return data;
+  }, [totalDebt, interestRate, expenses, extraPayment]);
+
+  const pieData = [
+    ...expenses.filter(e => e.active).map((exp, index) => ({ name: exp.name, value: exp.budget, color: CHART_COLORS[index % CHART_COLORS.length] })),
+    { name: 'Savings & Envelopes', value: totalSavings, color: THEME.gold },
+    ...(subsActive ? [{ name: 'Subscriptions', value: subsAmount, color: '#f97316' }] : [])
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-12">
+      {/* Header */}
+      <nav className="bg-[#0f172a] border-b border-slate-800 sticky top-0 z-50 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl">
+        <div className="flex items-center gap-3">
+          <div className="bg-[#eab308] p-1.5 rounded-lg">
+            <Wallet className="w-6 h-6 text-[#0f172a]" />
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-white">CareerBudget <span className="text-[#eab308]">Pro</span></h1>
+        </div>
+        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+          {['dashboard', 'planner', 'accelerator'].map((tab) => (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2 rounded-lg text-sm font-bold capitalize transition-all ${activeTab === tab ? 'bg-[#eab308] text-[#0f172a] shadow-lg' : 'text-slate-400 hover:text-white'}`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <main className="max-w-6xl mx-auto px-6 mt-8">
+        
+        {/* Career Selection Section */}
+        <section className="bg-white rounded-2xl border border-slate-200 p-6 mb-8 shadow-sm overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#eab308]/5 rounded-full -mr-16 -mt-16"></div>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Briefcase className="text-[#eab308] w-5 h-5" />
+              <h2 className="text-lg font-black text-[#0f172a]">CAREER PATH</h2>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">1. Select Profession</label>
+                <select 
+                  className="w-full p-3 rounded-xl border-slate-200 bg-slate-50 focus:ring-2 focus:ring-[#eab308] outline-none transition-all font-bold text-[#0f172a]"
+                  value={selectedCareer.id}
+                  onChange={(e) => {
+                    const c = CAREERS.find(career => career.id === e.target.value);
+                    setSelectedCareer(c);
+                    setManualSalary(c.entrySalary);
+                  }}
+                >
+                  {CAREERS.map(career => (
+                    <option key={career.id} value={career.id}>{career.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">2. Annual Salary ($)</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-3.5 w-4 h-4 text-[#eab308]" />
+                  <input 
+                    type="number"
+                    value={manualSalary}
+                    onChange={(e) => setManualSalary(parseInt(e.target.value) || 0)}
+                    className="w-full p-3 pl-10 rounded-xl border-slate-200 bg-slate-50 focus:ring-2 focus:ring-[#eab308] outline-none transition-all font-black text-[#0f172a]"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="md:col-span-2 flex items-center bg-[#0f172a] rounded-2xl p-6 border border-slate-800 shadow-inner">
+              <div className="flex-1">
+                <p className="text-xs text-[#eab308] font-bold uppercase tracking-wider mb-1">Monthly Take-Home Projection</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-black text-white">${monthlyIncome.toLocaleString()}</span>
+                  <span className="text-slate-400 text-sm font-medium">/ month net</span>
+                </div>
+                <p className="text-slate-400 text-sm mt-2 italic">
+                  {selectedCareer.id === 'other' ? "Customizing your financial journey." : selectedCareer.description}
+                </p>
+              </div>
+              <div className="hidden sm:block">
+                <TrendingUp className="w-16 h-16 text-slate-800" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Stats Bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Take-Home', val: `$${monthlyIncome.toLocaleString()}`, color: 'text-[#0f172a]' },
+            { label: 'Total Outflow', val: `$${totalExpenses.toLocaleString()}`, color: 'text-slate-600' },
+            { label: 'Net Surplus', val: `$${remainingBalance.toLocaleString()}`, color: remainingBalance >= 0 ? 'text-emerald-600' : 'text-red-600' },
+            { label: 'Savings Rate', val: `${savingsRate}%`, color: 'text-[#eab308]' }
+          ].map((stat, i) => (
+            <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm border-b-4 border-b-[#eab308]/20">
+              <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest">{stat.label}</p>
+              <p className={`text-xl font-black ${stat.color}`}>{stat.val}</p>
+            </div>
+          ))}
+        </div>
+
+        {activeTab === 'dashboard' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8">
+              {/* Random Shock System */}
+              <div className="bg-[#0f172a] rounded-2xl p-6 text-white relative overflow-hidden shadow-xl border border-slate-800">
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-5 h-5 text-[#eab308] fill-[#eab308]" />
+                      <h3 className="font-bold text-lg">Reality Check Simulator</h3>
+                    </div>
+                    <button 
+                      onClick={triggerRandomEvent}
+                      className="px-4 py-2 bg-[#eab308] hover:bg-[#c69806] text-[#0f172a] rounded-xl transition-colors text-sm font-bold flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" /> Trigger Event
+                    </button>
+                  </div>
+
+                  {currentEvent ? (
+                    <div className={`p-4 rounded-xl border-2 flex items-start gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500 ${
+                      currentEvent.severity === 'bonus' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'
+                    }`}>
+                      <div className={`p-2 rounded-lg ${currentEvent.severity === 'bonus' ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                        <AlertCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-lg">{currentEvent.title}</h4>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-white/10">
+                            {currentEvent.cost > 0 ? `-$${Math.abs(currentEvent.cost)}` : `+$${Math.abs(currentEvent.cost)}`}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-300 mt-1">{currentEvent.description}</p>
+                        <button onClick={() => setCurrentEvent(null)} className="mt-3 text-xs font-bold text-[#eab308] hover:underline">Clear Event</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center border-2 border-dashed border-slate-700 rounded-xl">
+                      <p className="text-slate-500 text-sm italic">Simulate an unexpected financial shock to test your emergency fund.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Charts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                   <h3 className="font-bold text-[#0f172a] mb-4 flex items-center gap-2 uppercase text-xs tracking-widest">
+                    <PieChartIcon className="w-4 h-4 text-[#eab308]" /> Spending Mix
+                   </h3>
+                   <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                          {pieData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontWeight: 'bold' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                   </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                   <h3 className="font-bold text-[#0f172a] mb-4 flex items-center gap-2 uppercase text-xs tracking-widest">
+                    <TrendingUp className="w-4 h-4 text-[#eab308]" /> Cash Flow
+                   </h3>
+                   <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[{ name: 'Budget', Income: monthlyIncome, Expenses: totalExpenses }]}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{fill: '#f8fafc'}} />
+                        <Bar dataKey="Income" fill="#0f172a" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Expenses" fill="#eab308" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar Tools */}
+            <div className="space-y-6">
+              <div className="bg-[#0f172a] text-white p-6 rounded-2xl shadow-xl border border-slate-800 relative overflow-hidden">
+                <ShieldCheck className="absolute -right-4 -bottom-4 w-24 h-24 text-white/5" />
+                <h3 className="font-bold text-lg mb-2 text-[#eab308]">Safety Check</h3>
+                <p className="text-slate-400 text-sm mb-4">Targeting 3-6 months of expenses in liquidity.</p>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
+                  <p className="text-xs uppercase font-bold text-slate-500">Savings Contribution</p>
+                  <p className="text-3xl font-black text-white">${totalSavings.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'planner' && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            
+            {/* Savings Lab Section */}
+            <section className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+              <div className="bg-[#0f172a] p-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-[#eab308]/20 p-2 rounded-lg">
+                    <Beaker className="text-[#eab308] w-6 h-6" />
+                  </div>
+                  <h3 className="text-white font-black uppercase tracking-widest text-sm">Component 01: Savings Lab</h3>
+                </div>
+                <div className="bg-[#eab308] text-[#0f172a] px-3 py-1 rounded-full text-xs font-black">
+                  SURPLUS: ${remainingBalance}
+                </div>
+              </div>
+              
+              <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${emergencyFundActive ? 'bg-[#eab308] text-[#0f172a]' : 'bg-slate-200 text-slate-400'}`}>
+                        <ShieldCheck className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-black text-[#0f172a] uppercase text-xs">Emergency Fund</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Safety Protocol Active</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setEmergencyFundActive(!emergencyFundActive)}
+                      className={`w-14 h-8 rounded-full transition-all relative ${emergencyFundActive ? 'bg-[#eab308]' : 'bg-slate-300'}`}
+                    >
+                      <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${emergencyFundActive ? 'right-1' : 'left-1'}`} />
+                    </button>
+                  </div>
+
+                  {emergencyFundActive && (
+                    <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                      <div className="flex justify-between items-center px-1">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Monthly Allocation</span>
+                        <span className="text-lg font-black text-[#eab308]">${emergencyFundAmount}</span>
+                      </div>
+                      <input 
+                        type="range" min="0" max="2000" step="50"
+                        value={emergencyFundAmount}
+                        onChange={(e) => setEmergencyFundAmount(parseInt(e.target.value))}
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#eab308]"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <Mail className="w-3 h-3 text-[#eab308]" /> Liquidity Envelopes
+                  </h4>
+                  {envelopes.map((env) => (
+                    <div key={env.id} className="grid grid-cols-12 gap-3 items-center">
+                      <div className="col-span-7 relative">
+                        <Edit3 className="absolute left-3 top-3 w-3 h-3 text-slate-300 pointer-events-none" />
+                        <input 
+                          type="text" 
+                          value={env.title}
+                          onChange={(e) => updateEnvelope(env.id, 'title', e.target.value)}
+                          className="w-full p-2.5 pl-9 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-[#0f172a] focus:ring-1 focus:ring-[#eab308] outline-none"
+                        />
+                      </div>
+                      <div className="col-span-5 relative">
+                        <DollarSign className="absolute left-3 top-3 w-3 h-3 text-[#eab308]" />
+                        <input 
+                          type="number"
+                          value={env.amount}
+                          onChange={(e) => updateEnvelope(env.id, 'amount', e.target.value)}
+                          className="w-full p-2.5 pl-8 bg-[#fefce8] border border-[#fef08a] rounded-xl text-xs font-black text-[#a16207] focus:ring-1 focus:ring-[#eab308] outline-none"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Expense Synthesis Lab Section */}
+            <section className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+              <div className="bg-[#0f172a] p-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-[#eab308]/20 p-2 rounded-lg">
+                    <Layers className="text-[#eab308] w-6 h-6" />
+                  </div>
+                  <h3 className="text-white font-black uppercase tracking-widest text-sm">Component 02: Expense Synthesis Lab</h3>
+                </div>
+                <div className="flex items-center gap-4">
+                   <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-700">
+                      <Settings2 className="w-3 h-3 text-[#eab308]" />
+                      <span className="text-[10px] text-slate-300 font-bold uppercase">Synthesis Control</span>
+                   </div>
+                </div>
+              </div>
+
+              <div className="p-8">
+                {/* Custom Subscriptions Module (Always Top) */}
+                <div className="mb-10 bg-[#fefce8] p-5 rounded-2xl border border-[#fef08a] transition-all">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-[200px]">
+                      <div className={`p-2 rounded-lg shadow-md transition-all ${subsActive ? 'bg-[#eab308] text-[#0f172a]' : 'bg-slate-200 text-slate-400'}`}>
+                        <Film className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <label className={`font-black uppercase text-[10px] tracking-widest ${subsActive ? 'text-[#a16207]' : 'text-slate-400'}`}>Subscriptions</label>
+                          <button 
+                            onClick={() => setSubsActive(!subsActive)}
+                            className={`w-8 h-4 rounded-full transition-all relative ${subsActive ? 'bg-[#a16207]' : 'bg-slate-300'}`}
+                          >
+                            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${subsActive ? 'right-0.5' : 'left-0.5'}`} />
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-[#a16207]/60 font-bold">Netflix, Spotify, Gym, etc.</p>
+                      </div>
+                    </div>
+                    {subsActive && (
+                      <div className="flex items-center gap-6 flex-1 max-w-md animate-in slide-in-from-left-2">
+                        <input 
+                          type="range" min="0" max="500" step="5"
+                          value={subsAmount}
+                          onChange={(e) => setSubsAmount(parseInt(e.target.value))}
+                          className="flex-1 h-1.5 bg-[#fde047] rounded-lg appearance-none cursor-pointer accent-[#a16207]"
+                        />
+                        <div className="bg-white px-4 py-2 rounded-xl border border-[#fef08a] shadow-sm min-w-[80px] text-center">
+                          <span className="text-sm font-black text-[#0f172a]">${subsAmount}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Synthesis Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {expenses.map((exp) => (
+                    <div 
+                      key={exp.id} 
+                      className={`relative p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between min-h-[160px] ${
+                        exp.active 
+                          ? 'bg-white border-slate-200 shadow-sm ring-1 ring-slate-100' 
+                          : 'bg-slate-50 border-slate-100 opacity-60'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className={`p-2 rounded-lg transition-colors ${exp.active ? 'bg-[#0f172a] text-[#eab308]' : 'bg-slate-200 text-slate-400'}`}>
+                          {exp.icon}
+                        </div>
+                        <button 
+                          onClick={() => toggleExpenseActive(exp.id)}
+                          className={`px-2 py-1 rounded text-[8px] font-black uppercase transition-all ${
+                            exp.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {exp.active ? 'Active' : 'Offline'}
+                        </button>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className={`font-black uppercase text-[10px] tracking-widest block transition-colors ${exp.active ? 'text-[#0f172a]' : 'text-slate-400'}`}>
+                          {exp.name}
+                        </label>
+                        <div className="flex items-baseline gap-1">
+                          <span className={`text-xl font-black ${exp.active ? 'text-[#0f172a]' : 'text-slate-400'}`}>
+                            ${exp.active ? exp.budget : 0}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400">/mo</span>
+                        </div>
+                      </div>
+
+                      {exp.active && (
+                        <div className="mt-4 animate-in fade-in zoom-in-95 duration-200">
+                          <input 
+                            type="range" min="0" max={exp.max} step={exp.step}
+                            value={exp.budget}
+                            onChange={(e) => handleUpdateExpenseValue(exp.id, e.target.value)}
+                            className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-[#eab308]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeTab === 'accelerator' && (
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-xl">
+            <div className="flex flex-col lg:flex-row gap-12">
+              <div className="lg:w-1/3 space-y-6">
+                <div>
+                  <h3 className="font-black text-2xl text-[#0f172a] uppercase tracking-tighter mb-2 italic">Debt Payoff Lab</h3>
+                  <p className="text-sm text-slate-500 mb-6 leading-relaxed">Analyze the impact of interest and extra principal payments on your student loans.</p>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <label className="text-[10px] font-black uppercase text-slate-400 block mb-2 tracking-widest">Total Student Debt</label>
+                    <input 
+                      type="number" value={totalDebt} onChange={(e) => setTotalDebt(parseInt(e.target.value) || 0)}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl font-black text-xl text-[#0f172a] outline-none focus:ring-2 focus:ring-[#eab308]"
+                    />
+                  </div>
+                  <div className="p-4 bg-[#fefce8] rounded-2xl border border-[#fef08a]">
+                    <label className="text-[10px] font-black uppercase text-[#a16207] block mb-2 tracking-widest">Extra Monthly Payment</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-[#eab308]" />
+                      <input 
+                        type="number" value={extraPayment} onChange={(e) => setExtraPayment(parseInt(e.target.value) || 0)}
+                        className="w-full p-2 pl-8 bg-white border border-[#fef08a] rounded-xl font-black text-xl text-[#0f172a] outline-none focus:ring-2 focus:ring-[#eab308]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:w-2/3">
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={debtProjection}>
+                      <defs>
+                        <linearGradient id="colorStd" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.1}/>
+                          <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorAcc" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#eab308" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="month" hide />
+                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold'}} />
+                      <Tooltip />
+                      <Legend verticalAlign="top" height={36}/>
+                      <Area name="Standard Plan" type="monotone" dataKey="Standard" stroke="#94a3b8" strokeWidth={2} fillOpacity={1} fill="url(#colorStd)" />
+                      <Area name="Accelerated Plan" type="monotone" dataKey="Accelerated" stroke="#eab308" strokeWidth={4} fillOpacity={1} fill="url(#colorAcc)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-8 p-4 bg-[#0f172a] rounded-2xl text-center">
+                   <p className="text-[#eab308] text-xs font-black uppercase tracking-widest mb-1">Impact Analysis</p>
+                   <p className="text-white font-medium text-sm">Every extra dollar paid toward principal avoids future interest costs and shortens your debt sentence.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      <footer className="max-w-6xl mx-auto px-6 mt-16 pb-12 border-t border-slate-200 pt-12 text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm mb-4">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span className="text-[10px] font-black uppercase tracking-tighter text-slate-500">Live Simulation Engine v3.1</span>
+        </div>
+        <p className="text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em]">© 2024 Personal Finance Interactive Class Tool</p>
+      </footer>
+    </div>
+  );
+}
